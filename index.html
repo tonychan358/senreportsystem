@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>特殊教育需要「學生支援摘要」電子生成系統 - 香港道教聯合會圓玄學院第三中學</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS (xlsx) for parsing Excel in browser -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Noto+Serif+TC:wght@600;700&family=Times+New+Roman&display=swap');
+    
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+    }
+    
+    .font-serif-tc {
+      font-family: 'Noto Serif TC', 'PMingLiU', 'BiaoKai', 'Times New Roman', serif;
+    }
+
+    /* A4 Paper Sheet Preview */
+    .a4-sheet {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 12mm 16mm;
+      margin: 0 auto 24px auto;
+      background: white;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.1);
+      box-sizing: border-box;
+      position: relative;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #111827;
+    }
+
+    /* Print Styles */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 8mm 12mm 8mm 12mm;
+      }
+      
+      body {
+        background: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      #mainLayoutContainer {
+        display: block !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .a4-sheet {
+        width: 100% !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .a4-sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      .print-border-black {
+        border-color: #000000 !important;
+      }
+
+      .avoid-break {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar (No Print) -->
+  <header class="no-print bg-slate-900 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-indigo-600 rounded-lg text-white">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight">特殊教育需要「學生支援摘要」生成系統</h1>
+          <p class="text-xs text-slate-400">香港道教聯合會圓玄學院第三中學 &middot; Tier 1~3 電子化報告</p>
+        </div>
+      </div>
+      <div class="flex items-center flex-wrap gap-2">
+        <!-- Display Mode Toggle (Full Form vs Compact) -->
+        <button id="btnDisplayModeToggle" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md text-xs font-semibold transition border border-slate-700 shadow-sm">
+          <i data-lucide="layout-grid" class="w-4 h-4 text-amber-400"></i>
+          <span id="displayModeText">切換至：精簡清爽模式</span>
+        </button>
+
+        <!-- Language Switch -->
+        <button id="btnLangToggle" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md text-xs font-semibold transition border border-slate-700">
+          <i data-lucide="languages" class="w-4 h-4 text-cyan-400"></i>
+          <span id="langToggleText">切換預設語言</span>
+        </button>
+
+        <!-- Direct Print Single -->
+        <button onclick="window.print()" class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-bold shadow transition">
+          <i data-lucide="printer" class="w-4 h-4"></i>
+          列印當前報告 (PDF)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div id="mainLayoutContainer" class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col lg:flex-row gap-6">
+
+    <!-- Left Sidebar (No Print) -->
+    <aside class="no-print w-full lg:w-96 flex flex-col gap-4 flex-shrink-0">
+
+      <!-- Upload Box -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-600"></i>
+            1. 上載 / 更新 Excel 資料
+          </span>
+          <span id="recordCountBadge" class="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-bold">0 位學生</span>
+        </div>
+
+        <label for="excelInput" class="border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/40 transition rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer text-center group">
+          <i data-lucide="file-up" class="w-7 h-7 text-slate-400 group-hover:text-indigo-600 transition mb-1.5"></i>
+          <span class="text-xs font-medium text-slate-700">上載「各級支援總表.xlsx」</span>
+          <span class="text-[11px] text-slate-400 mt-0.5">以星號「*」作為標準勾選標記 (自動讀取時數)</span>
+          <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" class="hidden" />
+        </label>
+        
+        <div id="fileInfoAlert" class="mt-2.5 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center justify-between">
+          <span id="fileInfoText" class="truncate font-medium text-slate-700">尚未載入檔案，請於上方上載 Excel</span>
+          <button id="btnResetData" class="text-[11px] text-indigo-600 hover:underline flex-shrink-0 ml-1">清空</button>
+        </div>
+
+        <!-- Validation & Error Diagnostic Box -->
+        <div id="validationAlertContainer" class="mt-2.5 hidden"></div>
+      </div>
+
+      <!-- Filters & Student Selector -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex-1 flex flex-col min-h-[480px]">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+            2. 學生清單與篩選
+          </span>
+          <div class="flex items-center gap-1.5">
+            <button id="btnSelectAll" class="text-[11px] text-indigo-600 hover:underline font-medium">全選</button>
+            <span class="text-slate-300">|</span>
+            <button id="btnUnselectAll" class="text-[11px] text-slate-500 hover:underline">取消</button>
+          </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="grid grid-cols-2 gap-2 mb-2.5">
+          <div>
+            <label class="text-[11px] font-medium text-slate-600 mb-0.5 block">班別篩選</label>
+            <select id="classFilter" class="w-full text-xs border border-slate-300 rounded p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <option value="">全部班別</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-medium text-slate-600 mb-0.5 block">支援層級</label>
+            <select id="tierFilter" class="w-full text-xs border border-slate-300 rounded p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <option value="">全部層級</option>
+              <option value="1">第一層 (Tier 1)</option>
+              <option value="2">第二層 (Tier 2)</option>
+              <option value="3">第三層 (Tier 3)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative mb-2.5">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <input type="text" id="searchInput" placeholder="搜尋學生姓名 / 班別 / 學號 / SEN..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
+
+        <!-- Student Items List -->
+        <div id="studentListContainer" class="flex-1 overflow-y-auto max-h-[360px] space-y-1.5 pr-1 text-xs divide-y divide-slate-100">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Batch Action Footer -->
+        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <span id="selectedCountText" class="text-xs text-slate-500 font-medium">已選 0 位學生</span>
+          <button id="btnPrintBatch" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-md text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+            批次輸出所選 (PDF)
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Right Main Preview Area -->
+    <main class="flex-1 flex flex-col items-center">
+      
+      <!-- Top Action Bar (No Print) -->
+      <div class="no-print w-full max-w-[210mm] bg-white rounded-xl shadow-sm border border-slate-200 p-3 mb-4 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100 flex items-center gap-1.5">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            A4 即時預覽
+          </span>
+          <span id="previewStudentBadge" class="text-xs text-slate-700 font-semibold bg-slate-100 px-2 py-0.5 rounded">尚未選擇學生</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            直接列印此頁 (Print)
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable A4 Container -->
+      <div id="printablePagesContainer" class="w-full flex flex-col items-center">
+        <!-- Rendered A4 Sheet -->
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+
+    // State Variables (Pure Upload Mode - No preloaded data)
+    let studentsList = [];
+    let filteredStudents = [];
+    let selectedStudentIds = new Set();
+    let currentStudentIndex = 0;
+    let onlyCheckedMode = false;
+
+    // Global Dynamic System Config (Loaded directly from Excel _系統設定, Zero Hardcoding)
+    let excelSystemConfig = {
+      school_name_zh: "",
+      school_name_en: "",
+      senco_name_zh: "",
+      senco_name_en: "",
+      senco_phone: "",
+      school_year: "",
+      intro_text_zh: "",
+      intro_text_en: "",
+      items: {},
+      section3List: []
+    };
+
+    // Helper to dynamically get item text from Excel Column H / I (or legacy E / F)
+    function getItemText(code, isEn = false, fallback = "") {
+      const item = excelSystemConfig.items && excelSystemConfig.items[code];
+      if (!item) return fallback;
+      return (isEn ? item.enText : item.zhText) || fallback;
+    }
+
+    // Helper to dynamically get item part / category name from Excel Column B / C
+    function getItemPart(code, isEn = false, fallback = "") {
+      const item = excelSystemConfig.items && excelSystemConfig.items[code];
+      if (!item) return fallback;
+      return (isEn ? item.catEn : item.catZh) || fallback;
+    }
+
+    // Global Helper: isChecked
+    function isChecked(v) {
+      if (v === null || v === undefined) return false;
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v === 1;
+      const s = String(v).trim().toUpperCase();
+      if (!s) return false;
+      return s === 'R' || s === 'TRUE' || s === '1' || s === 'YES' || s === 'Y' || 
+             s === 'V' || s === '✓' || s === '✔' || s === '☑' || s === '√' || 
+             s === '*' || s === '＊' || s === '★' || s === '☆' ||
+             s.includes('*') || s.includes('＊') || s.includes('✓') || s.includes('☑');
+    }
+
+    // Helper for 100% Dynamic Sub-Text Formatting (Driven purely by Excel Column K formatSpec)
+    function formatSubText(code, textVal, isEn = false, fallbackMain = "") {
+      const item = excelSystemConfig.items && excelSystemConfig.items[code];
+      const main = (item && (isEn ? item.enText : item.zhText)) ? (isEn ? item.enText : item.zhText) : fallbackMain;
+      if (!textVal || String(textVal).trim() === "") return main;
+
+      const trimmedVal = String(textVal).trim();
+      let fmt = (item && (isEn ? item.formatEn : item.formatZh)) ? (isEn ? item.formatEn : item.formatZh) : "";
+      
+      // Zero hardcoding: If not configured in Excel Column K, indicate missing format explicitly
+      if (!fmt) {
+        return `${main} <span class="text-rose-600 font-bold bg-rose-50 px-1 border border-rose-300 rounded text-[9pt]">[未在K欄設定格式: ${trimmedVal}]</span>`;
+      }
+
+      const formatted = fmt.replace(/\{text\}/gi, trimmedVal);
+
+      if (main.endsWith('）') && (formatted.startsWith('；') || formatted.startsWith('，') || formatted.startsWith(';'))) {
+        return main.slice(0, -1) + formatted + '）';
+      } else if (main.endsWith(')') && (formatted.startsWith(';') || formatted.startsWith(','))) {
+        return main.slice(0, -1) + formatted + ')';
+      }
+      return main + (formatted.startsWith(' ') || formatted.startsWith('（') || formatted.startsWith('(') ? '' : ' ') + formatted;
+    }
+
+    // Dynamic Time Slots Renderer (100% driven by Excel G Column fields and E/F Template)
+    function renderTimeSlots(code, s, isEn = false, isCompact = false) {
+      const item = excelSystemConfig.items && excelSystemConfig.items[code];
+      if (!item) return "";
+      const template = (isEn ? item.enText : item.zhText) || "";
+      const slots = item.slotsMap || {};
+      
+      let rendered = template;
+      for (const [key, slotCfg] of Object.entries(slots)) {
+        let val = '';
+        if (s.rawRow && slotCfg.colIdx >= 0) {
+          val = String(s.rawRow[slotCfg.colIdx] || '').trim();
+        }
+        const formattedVal = isCompact ? (val || ' ') : fillUnderline(val);
+        rendered = rendered.replace(new RegExp(`\\{${key}[^}]*\\}`, 'gi'), formattedVal);
+        if (key.length === 1) {
+          rendered = rendered.replace(new RegExp(`\\{${key}\\}`, 'gi'), formattedVal);
+        }
+      }
+      
+      const isItemChecked = s.rawRow && item.colIdx >= 0 ? isChecked(s.rawRow[item.colIdx]) : (s[code] || false);
+      if (isCompact) {
+        return rendered;
+      } else {
+        const cbHtml = isItemChecked ? '<span class="font-bold text-sm leading-none">☑</span>' : '<span class="text-sm leading-none">☐</span>';
+        return `<div>${cbHtml} ${rendered}</div>`;
+      }
+    }
+
+    // Dynamic Parent with Subitems Renderer (100% driven by Excel G Column parsing, supports English)
+    function renderParentWithSubitems(code, s, isEn = false, isCompact = false) {
+      const item = excelSystemConfig.items && excelSystemConfig.items[code];
+      if (!item) return "";
+      const mainText = (isEn ? item.enText : item.zhText) || "";
+      const subItems = item.subItems || [];
+      
+      const getSubLabel = (sub) => isEn ? (sub.labelEn || sub.labelZh || sub.label) : (sub.labelZh || sub.label);
+
+      if (isCompact) {
+        const checkedSubs = subItems.filter(sub => s.rawRow && sub.colIdx >= 0 && isChecked(s.rawRow[sub.colIdx]));
+        if (checkedSubs.length === 0) return "";
+        const sep = isEn ? ', ' : '、';
+        return `${mainText} ${checkedSubs.map(sub => getSubLabel(sub)).join(sep)}`;
+      } else {
+        const isParentChecked = s.rawRow && item.colIdx >= 0 ? isChecked(s.rawRow[item.colIdx]) : false;
+        const hasAnySubChecked = subItems.some(sub => s.rawRow && sub.colIdx >= 0 && isChecked(s.rawRow[sub.colIdx]));
+        const parentCb = (isParentChecked || hasAnySubChecked) ? '<span class="font-bold text-sm leading-none">☑</span>' : '<span class="text-sm leading-none">☐</span>';
+        
+        const subCbsHtml = subItems.map(sub => {
+          const isSubChecked = s.rawRow && sub.colIdx >= 0 && isChecked(s.rawRow[sub.colIdx]);
+          const cbMark = isSubChecked ? '<span class="font-bold text-sm leading-none">☑</span>' : '<span class="text-sm leading-none">☐</span>';
+          return `<span class="inline-block ml-2">${cbMark} ${getSubLabel(sub)}</span>`;
+        }).join('');
+        
+        return `<div>${parentCb} ${mainText} ${subCbsHtml}</div>`;
+      }
+    }
+
+    // Render SEN Diagnosis Box (100% Dynamic from Section 3 SEN診斷矩陣)
+    function renderDiagnosisBox(s, isEn = false) {
+      const diagItems = (excelSystemConfig.section3List || []).filter(it => 
+        it.catZh === 'SEN診斷矩陣' || it.catEn === 'SEN Diagnosis Matrix'
+      );
+      
+      const diagnosedList = [];
+      diagItems.forEach(it => {
+        const isDiagChecked = s.rawRow && it.colIdx >= 0 ? isChecked(s.rawRow[it.colIdx]) : (s[it.code] || false);
+        if (isDiagChecked) {
+          if (it.type === 'checkbox_with_sub_text') {
+            const subVal = s.rawRow && it.subColIdx >= 0 ? s.rawRow[it.subColIdx] : (s[it.code] || '');
+            diagnosedList.push(formatSubText(it.code, subVal, isEn, isEn ? (it.enText || 'Others') : (it.zhText || '其他')));
+          } else {
+            diagnosedList.push(isEn ? (it.enText || it.zhText) : (it.zhText || it.enText));
+          }
+        }
+      });
+
+      const fallbackText = isEn ? 'Tiered Support (No specific diagnosis recorded)' : '常規個別學習支援 (無特別診斷紀錄)';
+      return `
+        <div class="border border-black p-2 bg-white text-[10pt] mb-2 font-medium">
+          ${diagnosedList.length > 0 ? 
+            `<div class="flex flex-wrap gap-2 items-center">
+              ${diagnosedList.map(d => `<span class="inline-block bg-slate-100 border border-slate-400 px-2 py-0.5 rounded font-bold">☑ ${d}</span>`).join('')}
+            </div>` : 
+            `<span class="text-slate-500 italic">${fallbackText}</span>`
+          }
+        </div>
+      `;
+    }
+
+    // Render Full Support Table (100% Dynamic from Excel Section 3 B/C & D/E Columns)
+    function renderSupportTable(s, isEn = false, isCompact = false) {
+      const cb = (checked) => checked ? '<span class="font-bold text-sm leading-none">☑</span>' : '<span class="text-sm leading-none">☐</span>';
+
+      const categories = [];
+      const catMap = new Map();
+      
+      (excelSystemConfig.section3List || []).forEach(item => {
+        if (item.catZh === 'SEN診斷矩陣' || item.catEn === 'SEN Diagnosis Matrix') return;
+        const catKey = item.catZh || item.catEn || item.code;
+        const catName = isEn ? (item.catEn || item.catZh) : (item.catZh || item.catEn);
+        if (!catName) return;
+        
+        if (!catMap.has(catKey)) {
+          const catObj = {
+            key: catKey,
+            nameZh: item.catZh,
+            nameEn: item.catEn,
+            name: catName,
+            items: []
+          };
+          catMap.set(catKey, catObj);
+          categories.push(catObj);
+        }
+        catMap.get(catKey).items.push(item);
+      });
+
+      function renderItemsGroup(items) {
+        const activeList = [];
+        const fullList = [];
+
+        items.forEach(it => {
+          const isItemChecked = s.rawRow && it.colIdx >= 0 ? isChecked(s.rawRow[it.colIdx]) : (s[it.code] || false);
+          const mainText = isEn ? (it.enText || it.zhText) : (it.zhText || it.enText);
+
+          if (it.type === 'fixed_text') {
+            activeList.push(`<div class="whitespace-pre-line">${mainText}</div>`);
+            fullList.push(`<div class="whitespace-pre-line">${mainText}</div>`);
+          } else if (it.type === 'parent_with_subitems') {
+            const resCompact = renderParentWithSubitems(it.code, s, isEn, true);
+            if (resCompact) activeList.push(resCompact);
+            fullList.push(renderParentWithSubitems(it.code, s, isEn, false));
+          } else if (it.type === 'time_slots') {
+            if (isItemChecked) activeList.push(renderTimeSlots(it.code, s, isEn, true));
+            fullList.push(renderTimeSlots(it.code, s, isEn, false));
+          } else if (it.type === 'checkbox_with_sub_text') {
+            const subVal = s.rawRow && it.subColIdx >= 0 ? String(s.rawRow[it.subColIdx] || '').trim() : '';
+            if (isItemChecked) {
+              const formatted = formatSubText(it.code, subVal, isEn, mainText);
+              activeList.push(formatted);
+              fullList.push(`<div>${cb(true)} ${formatted}</div>`);
+            } else {
+              fullList.push(`<div>${cb(false)} ${mainText}</div>`);
+            }
+          } else if (it.type === 'checkbox') {
+            if (isItemChecked) {
+              activeList.push(mainText);
+            }
+            fullList.push(`<div>${cb(isItemChecked)} ${mainText}</div>`);
+          }
+        });
+
+        return { activeList, fullList };
+      }
+      
+      const rowsHtml = categories.map(cat => {
+        const hasSubCats = cat.items.some(it => isEn ? Boolean(it.subCatEn) : Boolean(it.subCatZh));
+        let rightContentHtml = "";
+        
+        if (!hasSubCats) {
+          const { activeList, fullList } = renderItemsGroup(cat.items);
+          if (isCompact) {
+            const isAllFixed = cat.items.every(it => it.type === 'fixed_text');
+            if (isAllFixed) {
+              rightContentHtml = activeList.join('');
+            } else {
+              rightContentHtml = activeList.length > 0 
+                ? activeList.map(a => `<div><span class="font-bold text-slate-900">☑ ${a}</span></div>`).join('') 
+                : `<div class="text-slate-500 italic">${isEn ? 'No arrangement recorded' : '無特別安排紀錄'}</div>`;
+            }
+          } else {
+            rightContentHtml = `<div class="space-y-0.5">${fullList.join('')}</div>`;
+          }
+        } else {
+          const subCatMap = new Map();
+          const subCats = [];
+          cat.items.forEach(item => {
+            const subKey = item.subCatZh || item.subCatEn;
+            const subName = isEn ? (item.subCatEn || item.subCatZh) : (item.subCatZh || item.subCatEn);
+            if (!subCatMap.has(subKey)) {
+              const sObj = { key: subKey, name: subName, items: [] };
+              subCatMap.set(subKey, sObj);
+              subCats.push(sObj);
+            }
+            subCatMap.get(subKey).items.push(item);
+          });
+          
+          if (isCompact) {
+            const renderedSections = [];
+            subCats.forEach(sc => {
+              const { activeList } = renderItemsGroup(sc.items);
+              if (activeList.length > 0) {
+                renderedSections.push(`
+                  <div>
+                    <span class="font-bold text-slate-900">${sc.name}</span>
+                    <ul class="list-disc pl-5 mt-0.5 space-y-0.5 font-medium">
+                      ${activeList.map(ai => `<li>${ai}</li>`).join('')}
+                    </ul>
+                  </div>
+                `);
+              }
+            });
+            
+            rightContentHtml = renderedSections.length > 0 ? renderedSections.join('<div class="my-1.5 border-t border-slate-200"></div>') : `<div class="text-slate-500 italic">${isEn ? 'No specific outside class support recorded for this academic year.' : '本學年暫無特別課堂外支援項目'}</div>`;
+          } else {
+            const renderedSections = subCats.map(sc => {
+              const { fullList } = renderItemsGroup(sc.items);
+              return `
+                <div>
+                  <div class="font-bold text-[9.5pt]">${sc.name}</div>
+                  <div class="pl-2 space-y-0.5 mt-0.5">
+                    ${fullList.join('')}
+                  </div>
+                </div>
+              `;
+            }).join('');
+            
+            rightContentHtml = `<div class="space-y-1.5">${renderedSections}</div>`;
+          }
+        }
+        
+        return `
+          <tr>
+            <td class="border border-black p-1.5 font-bold w-20 text-center align-middle bg-slate-50 print-border-black" style="font-size: ${isEn ? '9pt' : '10pt'};">
+              ${cat.name}
+            </td>
+            <td class="border border-black p-1.5 text-[9.5pt] leading-normal">
+              ${rightContentHtml}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      
+      return `
+        <table class="w-full border-collapse border border-black text-[10pt] leading-normal">
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // DOM Elements
+    const excelInput = document.getElementById('excelInput');
+    const btnResetData = document.getElementById('btnResetData');
+    const recordCountBadge = document.getElementById('recordCountBadge');
+    const fileInfoText = document.getElementById('fileInfoText');
+    const classFilter = document.getElementById('classFilter');
+    const tierFilter = document.getElementById('tierFilter');
+    const searchInput = document.getElementById('searchInput');
+    const studentListContainer = document.getElementById('studentListContainer');
+    const btnSelectAll = document.getElementById('btnSelectAll');
+    const btnUnselectAll = document.getElementById('btnUnselectAll');
+    const btnPrintBatch = document.getElementById('btnPrintBatch');
+    const selectedCountText = document.getElementById('selectedCountText');
+    const previewStudentBadge = document.getElementById('previewStudentBadge');
+    const printablePagesContainer = document.getElementById('printablePagesContainer');
+    const btnLangToggle = document.getElementById('btnLangToggle');
+    const langToggleText = document.getElementById('langToggleText');
+    const btnDisplayModeToggle = document.getElementById('btnDisplayModeToggle');
+    const displayModeText = document.getElementById('displayModeText');
+
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Event Listeners
+    excelInput.addEventListener('change', handleExcelUpload);
+    btnResetData.addEventListener('click', () => {
+      studentsList = [];
+      filteredStudents = [];
+      selectedStudentIds.clear();
+      currentStudentIndex = 0;
+      fileInfoText.textContent = "尚未載入檔案，請於上方上載 Excel";
+      recordCountBadge.textContent = "0 位學生";
+      recordCountBadge.className = "text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-bold";
+      excelInput.value = "";
+      const validationAlertContainer = document.getElementById('validationAlertContainer');
+      if (validationAlertContainer) {
+        validationAlertContainer.innerHTML = "";
+        validationAlertContainer.className = "mt-2.5 hidden";
+      }
+      populateFilters();
+      applyFilters();
+    });
+
+    btnDisplayModeToggle.addEventListener('click', () => {
+      onlyCheckedMode = !onlyCheckedMode;
+      displayModeText.textContent = onlyCheckedMode ? "切換至：完整文件表格模式" : "切換至：精簡清爽模式";
+      if (filteredStudents.length > 0 && filteredStudents[currentStudentIndex]) {
+        renderSinglePreview(filteredStudents[currentStudentIndex]);
+      }
+    });
+
+    btnLangToggle.addEventListener('click', () => {
+      const cur = filteredStudents[currentStudentIndex];
+      if (cur) {
+        cur.target_lang = cur.target_lang === 'en' ? 'zh' : 'en';
+        updateStudentListUI();
+        renderSinglePreview(cur);
+      }
+    });
+
+    classFilter.addEventListener('change', applyFilters);
+    tierFilter.addEventListener('change', applyFilters);
+    searchInput.addEventListener('input', applyFilters);
+
+    btnSelectAll.addEventListener('click', () => {
+      filteredStudents.forEach(s => selectedStudentIds.add(s.strn || s.student_name));
+      updateStudentListUI();
+    });
+
+    btnUnselectAll.addEventListener('click', () => {
+      selectedStudentIds.clear();
+      updateStudentListUI();
+    });
+
+    btnPrintBatch.addEventListener('click', handleBatchPrint);
+
+    // Initial setup
+    populateFilters();
+    applyFilters();
+
+    // Filter populations
+    function populateFilters() {
+      const classes = Array.from(new Set(studentsList.map(s => s.class_name).filter(Boolean))).sort();
+      classFilter.innerHTML = `<option value="">全部班別 (${classes.length})</option>` + 
+        classes.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function applyFilters() {
+      if (studentsList.length === 0) {
+        filteredStudents = [];
+        updateStudentListUI();
+        printablePagesContainer.innerHTML = `
+          <div class="w-full max-w-[210mm] min-h-[297mm] bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-center text-slate-400">
+            <div class="w-16 h-16 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 mb-4 shadow-sm">
+              <i data-lucide="file-spreadsheet" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-700 mb-1">歡迎使用 SEN 學生支援摘要生成系統</h3>
+            <p class="text-xs text-slate-500 max-w-md leading-relaxed">
+              請先在左側上載填寫好的「各級支援總表」Excel 檔案，系統將自動解析全校學生數據並提供即時 A4 文件預覽與批次 PDF 輸出。
+            </p>
+          </div>
+        `;
+        previewStudentBadge.textContent = "尚未載入學生";
+        lucide.createIcons();
+        return;
+      }
+
+      const cVal = classFilter.value;
+      const tVal = tierFilter.value;
+      const qVal = searchInput.value.trim().toLowerCase();
+
+      filteredStudents = studentsList.filter(s => {
+        const matchClass = !cVal || s.class_name === cVal;
+        const matchTier = !tVal || String(s.tier) === String(tVal);
+        const matchQuery = !qVal || 
+          s.student_name.toLowerCase().includes(qVal) ||
+          s.class_name.toLowerCase().includes(qVal) ||
+          String(s.class_no).includes(qVal) ||
+          (s.strn && s.strn.toLowerCase().includes(qVal));
+
+        return matchClass && matchTier && matchQuery;
+      });
+
+      if (currentStudentIndex >= filteredStudents.length) {
+        currentStudentIndex = 0;
+      }
+
+      updateStudentListUI();
+      if (filteredStudents.length > 0) {
+        renderSinglePreview(filteredStudents[currentStudentIndex]);
+      } else {
+        printablePagesContainer.innerHTML = `
+          <div class="a4-sheet flex items-center justify-center text-slate-400">
+            <p>沒有符合篩選條件的學生資料</p>
+          </div>
+        `;
+        previewStudentBadge.textContent = "無學生";
+      }
+    }
+
+    function updateStudentListUI() {
+      selectedCountText.textContent = `已選 ${selectedStudentIds.size} 位學生`;
+      btnPrintBatch.disabled = selectedStudentIds.size === 0;
+
+      if (studentsList.length === 0) {
+        studentListContainer.innerHTML = `
+          <div class="text-center py-12 text-slate-400">
+            <i data-lucide="file-up" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+            <p class="font-medium text-slate-600 text-xs">尚未載入學生名單</p>
+            <p class="text-[11px] text-slate-400 mt-1">請先於上方上載「各級支援總表.xlsx」</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      if (filteredStudents.length === 0) {
+        studentListContainer.innerHTML = `
+          <div class="text-center py-8 text-slate-400">
+            <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-1 opacity-40"></i>
+            <p>無符合的學生</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      studentListContainer.innerHTML = filteredStudents.map((s, idx) => {
+        const sKey = s.strn || s.student_name;
+        const isSelected = selectedStudentIds.has(sKey);
+        const isActive = idx === currentStudentIndex;
+        const isEn = s.target_lang === 'en';
+
+        // Extract active diagnoses tags
+        const diagTags = [];
+        if (s.spld) diagTags.push("讀寫");
+        if (s.sli) diagTags.push("語障");
+        if (s.asd) diagTags.push("自閉");
+        if (s.adhd) diagTags.push("ADHD");
+        if (s.ld) diagTags.push("有限智能");
+        if (s.mi) diagTags.push("精神病");
+        if (s.idd) diagTags.push("智障");
+        if (s.hi) diagTags.push("聽障");
+        if (s.pd) diagTags.push("肢障");
+        if (s.vi) diagTags.push("視障");
+
+        return `
+          <div class="student-row p-2 rounded-lg flex items-center justify-between cursor-pointer transition gap-1.5 ${
+            isActive ? 'bg-indigo-50 border border-indigo-200 shadow-sm' : 'hover:bg-slate-50 border border-transparent'
+          }" onclick="selectStudentByIndex(${idx})">
+            <div class="flex items-center gap-2 overflow-hidden flex-1">
+              <input type="checkbox" class="rounded text-indigo-600 focus:ring-0 cursor-pointer flex-shrink-0" 
+                ${isSelected ? 'checked' : ''} 
+                onclick="event.stopPropagation(); toggleStudentCheckbox('${sKey}')">
+              <div class="truncate">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900">${s.student_name}</span>
+                  <span class="text-[10px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded font-medium">${s.class_name} (${s.class_no})</span>
+                  <span class="text-[10px] px-1.5 py-0.2 ${s.tier === '3' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'} rounded font-semibold">Tier ${s.tier}</span>
+                  ${s.is_ncs ? '<span class="text-[9px] px-1 bg-amber-100 text-amber-800 border border-amber-300 rounded font-bold">非華語</span>' : ''}
+                </div>
+                <div class="text-[10px] text-slate-500 truncate mt-0.5">${diagTags.join(' / ') || '常規支援'}</div>
+              </div>
+            </div>
+
+            <!-- Language Switcher for Single Student -->
+            <div class="flex items-center bg-slate-200 rounded p-0.5 border border-slate-300 flex-shrink-0" onclick="event.stopPropagation()">
+              <button type="button" title="切換為中文版" class="px-1.5 py-0.5 text-[10px] rounded font-semibold transition ${!isEn ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}" onclick="setStudentLang('${sKey}', 'zh')">中</button>
+              <button type="button" title="Switch to English" class="px-1.5 py-0.5 text-[10px] rounded font-semibold transition ${isEn ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}" onclick="setStudentLang('${sKey}', 'en')">EN</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function toggleStudentCheckbox(key) {
+      if (selectedStudentIds.has(key)) {
+        selectedStudentIds.delete(key);
+      } else {
+        selectedStudentIds.add(key);
+      }
+      updateStudentListUI();
+    }
+
+    window.selectStudentByIndex = function(idx) {
+      currentStudentIndex = idx;
+      updateStudentListUI();
+      renderSinglePreview(filteredStudents[idx]);
+    };
+
+    window.setStudentLang = function(sKey, lang) {
+      const stu = studentsList.find(s => (s.strn || s.student_name) === sKey);
+      if (stu) {
+        stu.target_lang = lang;
+        updateStudentListUI();
+        if (filteredStudents[currentStudentIndex] && (filteredStudents[currentStudentIndex].strn || filteredStudents[currentStudentIndex].student_name) === sKey) {
+          renderSinglePreview(filteredStudents[currentStudentIndex]);
+        }
+      }
+    };
+
+    // Render single A4 preview
+    function renderSinglePreview(student) {
+      if (!student) return;
+
+      const isEn = student.target_lang === 'en';
+      langToggleText.textContent = isEn ? "English Version" : "中文版";
+      const langBadge = isEn ? '<span class="text-indigo-600 font-bold">[English]</span>' : '<span class="text-indigo-600 font-bold">[中文版]</span>';
+      
+      previewStudentBadge.innerHTML = `${student.class_name} (${student.class_no}) ${student.student_name} - Tier ${student.tier} ${langBadge}`;
+      printablePagesContainer.innerHTML = isEn ? generateEnglishHtml(student, onlyCheckedMode) : generateChineseHtml(student, onlyCheckedMode);
+    }
+
+    // Helper for underline blanks
+    function fillUnderline(val, spaces = 2) {
+      if (val && String(val).trim() !== "") {
+        return `<span class="border-b border-black font-bold px-1 text-center inline-block min-w-[20px]">${val}</span>`;
+      }
+      return `<span class="border-b border-black inline-block min-w-[20px] text-center">&nbsp;&nbsp;</span>`;
+    }
+
+    // Generate Universal A4 Document HTML (100% Dynamic from Excel Config & Data)
+    function generateDocumentHtml(s, isEn = false, compactMode = false) {
+      if (!s) return "";
+      
+      const schoolName = isEn 
+        ? (excelSystemConfig.school_name_en || '<span class="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 border border-rose-300 rounded text-sm">[未設定學校英文名稱]</span>') 
+        : (excelSystemConfig.school_name_zh || '<span class="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 border border-rose-300 rounded text-sm">[未設定學校中文名稱]</span>');
+      
+      const yearStr = excelSystemConfig.school_year || '<span class="text-rose-600 font-bold">[未設定學年]</span>';
+      const docTitle = isEn ? `Summary of Special Education Support to Student (${yearStr})`
+                            : `特殊教育需要「學生支援摘要」 (${yearStr})`;
+      
+      const tierVal = s.tier ? s.tier : '<span class="text-rose-600 font-bold">未填寫</span>';
+      const tierHeader = isEn ? `Support Tier (Tiered Intervention Model): Tier &nbsp;<span class="border-b border-black px-4 inline-block font-bold">${tierVal}</span>`
+                              : `第 &nbsp;<span class="border-b border-black px-4 inline-block font-bold">${tierVal}</span> &nbsp;支援層級`;
+      
+      const studentMeta = isEn ? `
+        <div class="flex justify-between items-center text-xs font-bold mb-1.5 px-1">
+          <div>Student Name: <span class="border-b border-black px-4 inline-block min-w-[140px] text-center font-semibold text-sm">${s.student_name || '<span class="text-rose-600">無姓名</span>'}</span></div>
+          <div>Class: <span class="border-b border-black px-3 inline-block min-w-[45px] text-center font-semibold">${s.class_name || '<span class="text-rose-600">無班別</span>'}</span> ( <span class="border-b border-black px-2 inline-block min-w-[30px] text-center font-semibold">${s.class_no || '-'}</span> )</div>
+        </div>
+      ` : `
+        <div class="flex justify-between items-center text-xs font-bold mb-1.5 px-1">
+          <div>學生姓名：<span class="border-b border-black px-4 inline-block min-w-[140px] text-center font-semibold text-sm">${s.student_name || '<span class="text-rose-600">無姓名</span>'}</span></div>
+          <div>班別：<span class="border-b border-black px-3 inline-block min-w-[45px] text-center font-semibold">${s.class_name || '<span class="text-rose-600">無班別</span>'}</span> ( <span class="border-b border-black px-2 inline-block min-w-[30px] text-center font-semibold">${s.class_no || '-'}</span> )</div>
+        </div>
+      `;
+      
+      const diagTitle = isEn ? "Types of Special Educational Needs:" : "特殊教育需要（SEN）類別：";
+      const introNotice = isEn 
+        ? (excelSystemConfig.intro_text_en || '<span class="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 border border-rose-300 rounded">[未在 _系統設定 中填寫英文引言文字]</span>')
+        : (excelSystemConfig.intro_text_zh || '<span class="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 border border-rose-300 rounded">[未在 _系統設定 中填寫中文引言文字]</span>');
+
+      const sencoName = isEn ? (excelSystemConfig.senco_name_en || '<span class="text-rose-600 font-bold">[未設定主任英文名]</span>')
+                             : (excelSystemConfig.senco_name_zh || '<span class="text-rose-600 font-bold">[未設定主任姓名]</span>');
+      const sencoPhone = excelSystemConfig.senco_phone || '<span class="text-rose-600 font-bold">[未設定電話]</span>';
+
+      const footerText = isEn ? `For queries, please contact the SENCO ${sencoName} at ${sencoPhone}.`
+                              : `如有任何查詢，請致電 ${sencoPhone} 與學生支援組統籌主任${sencoName}聯絡。`;
+      const copyText = isEn ? "Copy is for parents recording." : "副本_家長存檔";
+
+      return `
+        <div class="a4-sheet flex flex-col justify-between text-black">
+          <div>
+            <!-- Header -->
+            <div class="text-center font-bold text-lg tracking-wider font-serif-tc mb-0.5">${schoolName}</div>
+            <div class="text-center font-bold text-base tracking-wide font-serif-tc mb-1">${docTitle}</div>
+            <div class="text-center font-bold text-sm mb-2">${tierHeader}</div>
+
+            <!-- Student Meta -->
+            ${studentMeta}
+
+            <!-- SEN Diagnosis -->
+            <div class="text-xs font-bold mb-1 px-1">${diagTitle}</div>
+            ${renderDiagnosisBox(s, isEn)}
+
+            <!-- Intro text -->
+            <div class="text-[10pt] mb-1.5 leading-tight px-1">${introNotice}</div>
+
+            <!-- Support Table (100% Dynamic from Excel Section 3) -->
+            ${renderSupportTable(s, isEn, compactMode)}
+          </div>
+
+          <!-- Footer -->
+          <div class="mt-2 pt-1 border-t border-slate-300">
+            <div class="text-[9.5pt] text-slate-800">${footerText}</div>
+            <div class="text-[9pt] text-slate-500 text-right font-mono mt-0.5">${copyText}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function generateChineseHtml(s, compactMode = false) {
+      return generateDocumentHtml(s, false, compactMode);
+    }
+
+    // Generate English A4 Document HTML
+    function generateEnglishHtml(s, compactMode = false) {
+      return generateDocumentHtml(s, true, compactMode);
+    }
+
+    // Batch Print
+    function handleBatchPrint() {
+      const selected = studentsList.filter(s => selectedStudentIds.has(s.strn || s.student_name));
+      if (selected.length === 0) {
+        alert("請至少勾選一位學生進行批次列印！");
+        return;
+      }
+
+      // Render each student in their specific selected language (Mixed Language PDF Support)
+      printablePagesContainer.innerHTML = selected.map(s => {
+        return s.target_lang === 'en' ? generateEnglishHtml(s, onlyCheckedMode) : generateChineseHtml(s, onlyCheckedMode);
+      }).join('');
+
+      setTimeout(() => {
+        window.print();
+        // Restore single preview after print dialog
+        setTimeout(() => {
+          renderSinglePreview(filteredStudents[currentStudentIndex]);
+        }, 1000);
+      }, 300);
+    }
+
+    // Helper to convert Excel Column Letter (e.g. 'A', 'Z', 'AI') to 0-based Index
+    function colLetterToIdx(colStr) {
+      if (!colStr) return -1;
+      const s = String(colStr).trim().toUpperCase();
+      let idx = 0;
+      for (let i = 0; i < s.length; i++) {
+        const code = s.charCodeAt(i);
+        if (code >= 65 && code <= 90) {
+          idx = idx * 26 + (code - 64);
+        }
+      }
+      return idx > 0 ? idx - 1 : -1;
+    }
+
+    // Excel Upload & Strict Error Diagnostic Parsing Handler
+    function handleExcelUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const validationAlertContainer = document.getElementById('validationAlertContainer');
+      validationAlertContainer.innerHTML = "";
+      validationAlertContainer.className = "mt-2.5 hidden";
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          const errors = [];
+          const warnings = [];
+
+          // 1. Check for `_系統設定` Config Sheet
+          let hasConfigSheet = false;
+          let colConfig = {};
+          for (const sName of workbook.SheetNames) {
+            if (sName === '_系統設定' || sName === '_Config' || sName.toLowerCase().includes('config')) {
+              hasConfigSheet = true;
+              const cfgWs = workbook.Sheets[sName];
+              const cfgRows = XLSX.utils.sheet_to_json(cfgWs, { header: 1, defval: "" });
+              
+              excelSystemConfig.school_name_zh = "";
+              excelSystemConfig.school_name_en = "";
+              excelSystemConfig.senco_name_zh = "";
+              excelSystemConfig.senco_name_en = "";
+              excelSystemConfig.senco_phone = "";
+              excelSystemConfig.school_year = "";
+              excelSystemConfig.intro_text_zh = "";
+              excelSystemConfig.intro_text_en = "";
+              excelSystemConfig.items = {};
+              excelSystemConfig.section3List = [];
+
+              cfgRows.forEach((r, rIdx) => {
+                const r0 = String(r[0] || '').trim();
+                const r1 = String(r[1] || '').trim();
+                const r2 = String(r[2] || '').trim();
+                const r3 = String(r[3] || '').trim();
+                const r4 = String(r[4] || '').trim();
+                const r5 = String(r[5] || '').trim();
+
+                let code = r0;
+
+                const isSec3_10 = /^(checkbox|fixed_text|time_slots|parent_with_subitems|checkbox_with_sub_text)$/i.test(r4);
+                const isSec3_11 = /^(checkbox|fixed_text|time_slots|parent_with_subitems|checkbox_with_sub_text)$/i.test(r5);
+                const isSec3_8 = /^(checkbox|fixed_text|time_slots|parent_with_subitems|checkbox_with_sub_text)$/i.test(r2);
+
+                // Section 1: School & Document Info (Supports both with/without Column A)
+                if (code === 'school_name' || /學校(全稱|名稱)/.test(r0)) {
+                  excelSystemConfig.school_name_zh = (code === 'school_name' ? r2 : r1);
+                  excelSystemConfig.school_name_en = (code === 'school_name' ? r3 : r2);
+                  return;
+                } else if (code === 'senco_name' || /統籌主任/.test(r0)) {
+                  excelSystemConfig.senco_name_zh = (code === 'senco_name' ? r2 : r1);
+                  excelSystemConfig.senco_name_en = (code === 'senco_name' ? r3 : r2);
+                  return;
+                } else if (code === 'senco_phone' || /(電話|查詢電話)/.test(r0)) {
+                  excelSystemConfig.senco_phone = (code === 'senco_phone' ? r2 : r1);
+                  return;
+                } else if (code === 'school_year' || /學年/.test(r0)) {
+                  excelSystemConfig.school_year = (code === 'school_year' ? r2 : r1);
+                  return;
+                } else if (code === 'intro_text' || /引言/.test(r0)) {
+                  excelSystemConfig.intro_text_zh = (code === 'intro_text' ? r2 : r1);
+                  excelSystemConfig.intro_text_en = (code === 'intro_text' ? r3 : r2);
+                  return;
+                }
+
+                // Section 2: Student meta mapping (Supports both with/without Column A)
+                let metaCode = '';
+                if (/學生姓名|Name/i.test(r0) || code === 'student_name') metaCode = 'student_name';
+                else if (/班別|Class/i.test(r0) || code === 'class_name') metaCode = 'class_name';
+                else if (/學號|Class No/i.test(r0) || code === 'class_no') metaCode = 'class_no';
+                else if (/學生編號|STRN/i.test(r0) || code === 'strn') metaCode = 'strn';
+                else if (/支援層級|Tier/i.test(r0) || code === 'tier') metaCode = 'tier';
+                else if (/非華語|外籍|NCS/i.test(r0) || code === 'ncs') metaCode = 'is_ncs';
+
+                if (metaCode) {
+                  if (/^[A-Za-z]{1,3}$/.test(r2)) {
+                    colConfig[metaCode] = colLetterToIdx(r2);
+                    return;
+                  } else if (/^[A-Za-z]{1,3}$/.test(r1)) {
+                    colConfig[metaCode] = colLetterToIdx(r1);
+                    return;
+                  }
+                }
+
+                // Skip headers
+                if (!r0 || r0.startsWith('設定') || r0.startsWith('一、') || r0.startsWith('二、') || r0.startsWith('三、') || r0.startsWith('項目代碼') || r0.startsWith('學校資訊') || r0.startsWith('表格') || r0.startsWith('大分類')) return;
+
+                // Section 3: Support Items
+                let catZh = '', catEn = '', subCatZh = '', subCatEn = '', stype = '', colLetter = '', zhText = '', enText = '', subColSpec = '', formatSpec = '';
+
+                if (isSec3_8) {
+                  // Clean 8-column format: [catZh(0), catEn(1), type(2), colLetter(3), zhText(4), enText(5), subColSpec(6), formatSpec(7)]
+                  catZh = r0;
+                  catEn = r1;
+                  stype = r2;
+                  colLetter = r3;
+                  zhText = r4;
+                  enText = r5;
+                  subColSpec = String(r[6] || '').trim();
+                  formatSpec = String(r[7] || '').trim();
+                  code = 'item_' + (colLetter || ('row_' + (rIdx + 1)));
+                } else if (isSec3_10) {
+                  // 10-column format: [catZh(0), catEn(1), subCatZh(2), subCatEn(3), type(4), colLetter(5), zhText(6), enText(7), subColSpec(8), formatSpec(9)]
+                  catZh = r0;
+                  catEn = r1;
+                  subCatZh = r2;
+                  subCatEn = r3;
+                  stype = r4;
+                  colLetter = r5;
+                  zhText = String(r[6] || '').trim();
+                  enText = String(r[7] || '').trim();
+                  subColSpec = String(r[8] || '').trim();
+                  formatSpec = String(r[9] || '').trim();
+                  code = 'item_' + (colLetter || ('row_' + (rIdx + 1)));
+                } else if (isSec3_11) {
+                  // 11-column format: [code(0), catZh(1), catEn(2), subCatZh(3), subCatEn(4), type(5), colLetter(6), zhText(7), enText(8), subColSpec(9), formatSpec(10)]
+                  catZh = r1;
+                  catEn = r2;
+                  subCatZh = r3;
+                  subCatEn = r4;
+                  stype = r5;
+                  colLetter = String(r[6] || '').trim();
+                  zhText = String(r[7] || '').trim();
+                  enText = String(r[8] || '').trim();
+                  subColSpec = String(r[9] || '').trim();
+                  formatSpec = String(r[10] || '').trim();
+                  if (!code) code = 'item_' + (colLetter || ('row_' + (rIdx + 1)));
+                } else {
+                  return;
+                }
+                
+                if (colLetter && /^[A-Za-z]{1,3}$/.test(colLetter)) {
+                  colConfig[code] = colLetterToIdx(colLetter);
+                }
+
+                if (stype) {
+                  let subColIdx = -1;
+                  const matchSub = subColSpec.match(/([A-Za-z]{1,3})/);
+                  if (matchSub) {
+                    subColIdx = colLetterToIdx(matchSub[1]);
+                  }
+
+                  let fmtZh = formatSpec;
+                  let fmtEn = formatSpec;
+                  if (formatSpec.includes('|')) {
+                    const fParts = formatSpec.split('|');
+                    fmtZh = fParts[0].trim();
+                    fmtEn = fParts[1].trim();
+                  }
+
+                  // Parent with subitems parsing (No hardcoded dictionary: if no English, fallback to Chinese)
+                  const subItems = [];
+                  if (stype === 'parent_with_subitems' && subColSpec) {
+                    const reParent = /([^,()]+)\(([A-Za-z]{1,3})\)/g;
+                    let pMatch;
+                    while ((pMatch = reParent.exec(subColSpec)) !== null) {
+                      const rawLabel = pMatch[1].trim();
+                      let labelZh = rawLabel;
+                      let labelEn = rawLabel; // 无打英文就出番中文
+                      if (rawLabel.includes('/') || rawLabel.includes('|')) {
+                        const parts = rawLabel.split(/[/|]/);
+                        labelZh = parts[0].trim();
+                        labelEn = parts[1].trim();
+                      }
+                      subItems.push({
+                        label: labelZh,
+                        labelZh: labelZh,
+                        labelEn: labelEn,
+                        colLetter: pMatch[2].trim(),
+                        colIdx: colLetterToIdx(pMatch[2].trim())
+                      });
+                    }
+
+                    // If formatSpec also provides English list
+                    if (formatSpec) {
+                      const reEn = /([^,()]+)\(([A-Za-z]{1,3})\)/g;
+                      let pMatchEn;
+                      while ((pMatchEn = reEn.exec(formatSpec)) !== null) {
+                        const enLabel = pMatchEn[1].trim();
+                        const enCol = pMatchEn[2].trim().toUpperCase();
+                        const found = subItems.find(it => it.colLetter.toUpperCase() === enCol);
+                        if (found) {
+                          found.labelEn = enLabel;
+                        }
+                      }
+                    }
+                  }
+
+                  // Time slots parsing
+                  const slotsMap = {};
+                  if (stype === 'time_slots' && subColSpec) {
+                    const reSlots = /([^:,]+)\s*:\s*([A-Za-z]{1,3})/g;
+                    let sMatch;
+                    while ((sMatch = reSlots.exec(subColSpec)) !== null) {
+                      slotsMap[sMatch[1].trim()] = {
+                        colLetter: sMatch[2].trim(),
+                        colIdx: colLetterToIdx(sMatch[2].trim())
+                      };
+                    }
+                  }
+
+                  const itemObj = {
+                    code: code,
+                    catZh: catZh,
+                    catEn: catEn,
+                    subCatZh: subCatZh,
+                    subCatEn: subCatEn,
+                    type: stype,
+                    colLetter: colLetter,
+                    colIdx: colLetter ? colLetterToIdx(colLetter) : -1,
+                    zhText: zhText,
+                    enText: enText,
+                    subColIdx: subColIdx,
+                    formatZh: fmtZh,
+                    formatEn: fmtEn,
+                    subItems: subItems,
+                    slotsMap: slotsMap
+                  };
+
+                  excelSystemConfig.items[code] = itemObj;
+                  excelSystemConfig.section3List.push(itemObj);
+                }
+              });
+              break;
+            }
+          }
+
+          // Strict Check 1: Must have `_系統設定`
+          if (!hasConfigSheet) {
+            validationAlertContainer.className = "mt-2.5 block";
+            validationAlertContainer.innerHTML = `
+              <div class="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-800 flex flex-col gap-2 shadow-xs">
+                <div class="font-bold flex items-center gap-1.5 text-rose-700 text-[12px]">
+                  <i data-lucide="alert-octagon" class="w-4 h-4"></i>
+                  上載失敗：缺少「_系統設定」工作表！
+                </div>
+                <p class="text-[11px] leading-relaxed text-rose-900">
+                  本系統為 100% 資料驅動架構，<strong>拒絕使用靜默寫死後備文字</strong>。上載的 Excel 中未找到「_系統設定」工作表，無法讀取學校資訊、欄位映射及支援項目定義。
+                </p>
+                <div class="pt-1.5 border-t border-rose-200">
+                  <span class="text-[10px] text-rose-600">請確保上載的 Excel 檔案包含「_系統設定」工作表。</span>
+                </div>
+              </div>
+            `;
+            lucide.createIcons();
+            alert("❌ 上載失敗：Excel 檔案中缺少「_系統設定」工作表！\n請確認檔案內包含「_系統設定」分頁。");
+            return;
+          }
+
+          // Diagnostic Checks for Section 1
+          if (!excelSystemConfig.school_name_zh) warnings.push("「_系統設定」第一部分未填寫「學校中文名稱」");
+          if (!excelSystemConfig.school_name_en) warnings.push("「_系統設定」第一部分未填寫「學校英文名稱」");
+          if (!excelSystemConfig.school_year) warnings.push("「_系統設定」第一部分未填寫「學年」");
+          if (!excelSystemConfig.senco_name_zh) warnings.push("「_系統設定」第一部分未填寫「統籌主任姓名」");
+          if (!excelSystemConfig.senco_phone) warnings.push("「_系統設定」第一部分未填寫「統籌主任聯絡電話」");
+          if (!excelSystemConfig.intro_text_zh) warnings.push("「_系統設定」第一部分未填寫「中文引言文字」");
+
+          // Diagnostic Checks for Section 2
+          if (colConfig['student_name'] === undefined) errors.push("「_系統設定」第二部分缺少「學生姓名 (student_name)」的欄位映射！");
+          if (colConfig['class_name'] === undefined) errors.push("「_系統設定」第二部分缺少「班別 (class_name)」的欄位映射！");
+
+          // Diagnostic Checks for Section 3
+          if (excelSystemConfig.section3List.length === 0) {
+            errors.push("「_系統設定」第三部分（支援項目對應表）未找到任何項目定義！");
+          } else {
+            excelSystemConfig.section3List.forEach(it => {
+              if (it.type === 'checkbox_with_sub_text' && !it.formatZh && !it.formatEn) {
+                warnings.push(`項目【${it.zhText || it.code}】在第三部分設定為 checkbox_with_sub_text，但在 K 欄未設定附加文字格式模板！`);
+              }
+            });
+          }
+
+          // 2. Select Data Sheet (First sheet that is not config)
+          let dataSheetName = workbook.SheetNames[0];
+          if (dataSheetName === '_系統設定' || dataSheetName === '_Config') {
+            dataSheetName = workbook.SheetNames[1];
+          }
+
+          if (!dataSheetName) {
+            errors.push("Excel 檔案中只有「_系統設定」，缺少學生資料工作表！");
+          }
+
+          if (errors.length > 0) {
+            validationAlertContainer.className = "mt-2.5 block";
+            validationAlertContainer.innerHTML = `
+              <div class="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-800 flex flex-col gap-2">
+                <div class="font-bold flex items-center gap-1.5 text-rose-700">
+                  <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                  Excel 設定存在以下嚴重錯誤，無法載入：
+                </div>
+                <ul class="list-disc pl-4 space-y-0.5 text-[11px] text-rose-900 font-medium">
+                  ${errors.map(e => `<li>${e}</li>`).join('')}
+                </ul>
+              </div>
+            `;
+            lucide.createIcons();
+            alert("❌ Excel 格式錯誤：\n" + errors.join("\n"));
+            return;
+          }
+
+          const worksheet = workbook.Sheets[dataSheetName];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+          if (!rawRows || rawRows.length < 2) {
+            alert(`學生資料工作表「${dataSheetName}」格式不符合（缺少足夠行數）！`);
+            return;
+          }
+
+          let ncsColIdx = colConfig['ncs'] !== undefined ? colConfig['ncs'] : -1;
+
+          // Helper getter
+          const getCol = (code) => {
+            return (colConfig[code] !== undefined && colConfig[code] >= 0) ? colConfig[code] : -1;
+          };
+
+          // Parse rows
+          const nameCol = getCol('student_name');
+          const classCol = getCol('class_name');
+          const tierCol = getCol('tier');
+          const noCol = getCol('class_no');
+          const strnCol = getCol('strn');
+
+          const parsed = [];
+          for (let r = 1; r < rawRows.length; r++) {
+            const row = rawRows[r];
+            const name = nameCol >= 0 ? String(row[nameCol] || '').trim() : '';
+            const cls = classCol >= 0 ? String(row[classCol] || '').trim() : '';
+            if (!name && !cls) continue;
+
+            const isNcsStudent = ncsColIdx >= 0 ? isChecked(row[ncsColIdx]) : false;
+
+            parsed.push({
+              row_idx: r + 1,
+              rawRow: row,
+              is_ncs: isNcsStudent,
+              target_lang: isNcsStudent ? 'en' : 'zh',
+              tier: tierCol >= 0 ? String(row[tierCol] || '2').trim() : '2',
+              class_name: cls,
+              class_no: noCol >= 0 ? String(row[noCol] || '').trim() : '',
+              strn: strnCol >= 0 ? String(row[strnCol] || '').trim() : '',
+              student_name: name
+            });
+          }
+
+          if (parsed.length === 0) {
+            validationAlertContainer.className = "mt-2.5 block";
+            validationAlertContainer.innerHTML = `
+              <div class="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-800">
+                <div class="font-bold mb-1">⚠️ 未找到有效學生資料</div>
+                <p class="text-[11px]">在資料工作表「${dataSheetName}」中，未能依據第 ${nameCol + 1} 欄（姓名）及第 ${classCol + 1} 欄（班別）識別出任何有效學生資料。</p>
+              </div>
+            `;
+            lucide.createIcons();
+            alert(`⚠️ 資料解析提示：在工作表「${dataSheetName}」中未找到任何學生資料列！`);
+            return;
+          }
+
+          // Show warnings if any
+          if (warnings.length > 0) {
+            validationAlertContainer.className = "mt-2.5 block";
+            validationAlertContainer.innerHTML = `
+              <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 flex flex-col gap-1.5">
+                <div class="font-bold flex items-center gap-1.5 text-amber-800">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                  系統設定提示 (${warnings.length} 項缺失)：
+                </div>
+                <ul class="list-disc pl-4 space-y-0.5 text-[11px] text-amber-800">
+                  ${warnings.map(w => `<li>${w}</li>`).join('')}
+                </ul>
+              </div>
+            `;
+          } else {
+            validationAlertContainer.className = "mt-2.5 block";
+            validationAlertContainer.innerHTML = `
+              <div class="p-2 bg-emerald-50 border border-emerald-300 rounded-lg text-[11px] text-emerald-800 flex items-center gap-1.5 font-medium">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                Excel 系統設定與學生資料驗證通過 (100% 資料驅動)
+              </div>
+            `;
+          }
+
+          studentsList = parsed;
+          selectedStudentIds = new Set(studentsList.map(s => s.strn || s.student_name));
+          currentStudentIndex = 0;
+          fileInfoText.textContent = `已載入 ${file.name} (工作表: ${dataSheetName})`;
+          recordCountBadge.textContent = `${parsed.length} 位學生`;
+          recordCountBadge.className = "text-xs px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold";
+          
+          populateFilters();
+          applyFilters();
+          lucide.createIcons();
+        } catch (err) {
+          console.error(err);
+          validationAlertContainer.className = "mt-2.5 block";
+          validationAlertContainer.innerHTML = `
+            <div class="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-800">
+              <div class="font-bold mb-1">❌ Excel 解析異常</div>
+              <p class="text-[11px] font-mono">${err.message}</p>
+            </div>
+          `;
+          lucide.createIcons();
+          alert("解析 Excel 失敗：" + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  </script>
+</body>
+</html>
