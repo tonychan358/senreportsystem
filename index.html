@@ -1014,19 +1014,24 @@
 
                 // Section 2: Student meta mapping (Supports both with/without Column A)
                 let metaCode = '';
-                if (/學生姓名|Name/i.test(r0) || code === 'student_name') metaCode = 'student_name';
-                else if (/班別|Class/i.test(r0) || code === 'class_name') metaCode = 'class_name';
-                else if (/學號|Class No/i.test(r0) || code === 'class_no') metaCode = 'class_no';
-                else if (/學生編號|STRN/i.test(r0) || code === 'strn') metaCode = 'strn';
-                else if (/支援層級|Tier/i.test(r0) || code === 'tier') metaCode = 'tier';
-                else if (/非華語|外籍|NCS/i.test(r0) || code === 'ncs') metaCode = 'is_ncs';
+                const combinedMeta = (r0 + ' ' + r1).trim();
+                if (/學生姓名|^Name|Student\s*Name/i.test(combinedMeta) || code === 'student_name') metaCode = 'student_name';
+                else if (/學號|Class\s*No|Class\s*Number|座號/i.test(combinedMeta) || code === 'class_no') metaCode = 'class_no';
+                else if (/班別|班級|\bClass\b(?!\s*No)/i.test(combinedMeta) || code === 'class_name') metaCode = 'class_name';
+                else if (/學生編號|STRN/i.test(combinedMeta) || code === 'strn') metaCode = 'strn';
+                else if (/支援層級|Tier/i.test(combinedMeta) || code === 'tier') metaCode = 'tier';
+                else if (/非華語|外籍|NCS/i.test(combinedMeta) || code === 'ncs' || code === 'is_ncs') metaCode = 'is_ncs';
 
                 if (metaCode) {
+                  let targetIdx = -1;
                   if (/^[A-Za-z]{1,3}$/.test(r2)) {
-                    colConfig[metaCode] = colLetterToIdx(r2);
-                    return;
+                    targetIdx = colLetterToIdx(r2);
                   } else if (/^[A-Za-z]{1,3}$/.test(r1)) {
-                    colConfig[metaCode] = colLetterToIdx(r1);
+                    targetIdx = colLetterToIdx(r1);
+                  }
+                  if (targetIdx >= 0) {
+                    colConfig[metaCode] = targetIdx;
+                    if (metaCode === 'is_ncs') colConfig['ncs'] = targetIdx;
                     return;
                   }
                 }
@@ -1207,6 +1212,8 @@
           // Diagnostic Checks for Section 2
           if (colConfig['student_name'] === undefined) errors.push("「_系統設定」第二部分缺少「學生姓名 (student_name)」的欄位映射！");
           if (colConfig['class_name'] === undefined) errors.push("「_系統設定」第二部分缺少「班別 (class_name)」的欄位映射！");
+          if (colConfig['class_no'] === undefined) warnings.push("「_系統設定」第二部分缺少「學號 (class_no)」的欄位映射");
+          if (colConfig['is_ncs'] === undefined && colConfig['ncs'] === undefined) warnings.push("「_系統設定」第二部分缺少「非華語學生 (NCS)」的欄位映射");
 
           // Diagnostic Checks for Section 3
           if (excelSystemConfig.section3List.length === 0) {
@@ -1255,7 +1262,24 @@
             return;
           }
 
-          let ncsColIdx = colConfig['ncs'] !== undefined ? colConfig['ncs'] : -1;
+          // Smart Auto-Detection / Fallback from Data Sheet Row 0 Headers
+          if (rawRows.length > 0) {
+            const hRow = rawRows[0];
+            hRow.forEach((hVal, cIdx) => {
+              const hStr = String(hVal || '').replace(/\s+/g, '');
+              if (colConfig['student_name'] === undefined && /姓名|Name/i.test(hStr)) colConfig['student_name'] = cIdx;
+              if (colConfig['class_no'] === undefined && /學號|Class\s*No|座號/i.test(hStr)) colConfig['class_no'] = cIdx;
+              if (colConfig['class_name'] === undefined && (/班別|班級|\bClass\b/i.test(hStr) && !/學號/i.test(hStr))) colConfig['class_name'] = cIdx;
+              if (colConfig['tier'] === undefined && /層級|Tier/i.test(hStr)) colConfig['tier'] = cIdx;
+              if (colConfig['strn'] === undefined && /STRN|學生編號/i.test(hStr)) colConfig['strn'] = cIdx;
+              if ((colConfig['is_ncs'] === undefined && colConfig['ncs'] === undefined) && /非華語|外籍|NCS/i.test(hStr)) {
+                colConfig['is_ncs'] = cIdx;
+                colConfig['ncs'] = cIdx;
+              }
+            });
+          }
+
+          let ncsColIdx = colConfig['is_ncs'] !== undefined ? colConfig['is_ncs'] : (colConfig['ncs'] !== undefined ? colConfig['ncs'] : -1);
 
           // Helper getter
           const getCol = (code) => {
